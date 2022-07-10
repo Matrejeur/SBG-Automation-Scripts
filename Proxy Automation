@@ -1,0 +1,163 @@
+import pandas as pd
+import numpy as np
+import os
+import os.path
+from openpyxl import load_workbook
+# from openpyxl.workbook import Workbook
+
+from datetime import datetime
+from datetime import timedelta
+# current date and time
+now = datetime.now() - timedelta(days=1)
+s1 = now.strftime("%m-%d-%Y")
+#
+def checkiffileexists():
+    if os.path.exists('modified.xlsx'):
+        os.remove('modified.xlsx')
+        print("The file has been deleted successfully")
+
+    elif os.path.exists('maintable.xlsx'):
+         os.remove('maintable.xlsx')
+         print("The file has been deleted successfully")
+
+    elif os.path.exists('Proxy.xlsx'):
+        os.remove('Proxy.xlsx')
+        print("The file has been deleted successfully")
+    else:
+        print("The file does not exist")
+
+def saveinexcel():
+        checkiffileexists()
+
+ #  Convert the text file to excel and save
+        df= pd.read_csv('Proxy report_04_June_2022.txt', delimiter='|')
+        df.to_excel('modified.xlsx', index=False)
+
+# #Add 3 columns
+def InsertColums():
+    saveinexcel()
+    df = pd.read_excel('modified.xlsx')
+    x = 0
+    while x < 3:
+        df.insert(x, "", "",  allow_duplicates=True)
+        x += 1
+    os.remove('modified.xlsx')
+
+    df.to_excel("modified.xlsx", index=False)
+
+# # Populate Sol ID description
+def mergeTables():
+    InsertColums()
+    df1 = pd.read_excel('modified.xlsx')
+    df2 = pd.read_excel('SOL ID.xlsx')
+
+    df3 = pd.merge(df1, df2, on = 'SOL_ID', how='inner')
+
+    df3 = df3[['SOL_ID',	'SOL_DESC',	'STATE_CODE',	'FORACID',	'FORACID_1',	'CIF_ID',	'CID_ID_1',	'ACCT_NAME',	'CLR_BAL_AMT',	'LIEN_AMT' ,	'TRAN_DATE'	,'TRAN_ID'	, 'PART_TRAN_TYPE'	,'PART_TRAN_SRL_NUM',	'TRAN_PARTICULAR',	'OTT_CRNCY_CODE',	'ORG_TRAN_AMT',	'ACCT_DOMICILE_BRANCH',	'SEGMENT',	'SUBSEGMENT',	'ACCOUNT_STATUS',	'TOTAL_OFFSET_AMOUNT', 'PROXYLIEN',	'PND_STATUS',	'SCHM_CODE'
+
+    ]]
+
+    os.remove('modified.xlsx')
+
+    df3.to_excel("modified.xlsx", index= False)
+
+def InsertColums1():
+    mergeTables()
+    df = pd.read_excel('modified.xlsx')
+    y = ['NET AMOUNT', 'LCY-EQV',	'PROOF_DATE','AGE ANALYSIS (DAYS)', 'SUFFICIENTLY FUNDED']
+    for i in y:
+        df[i] = ""
+
+    df['NET AMOUNT'] = df['ORG_TRAN_AMT'] - df['TOTAL_OFFSET_AMOUNT']
+    df['SUFFICIENTLY FUNDED'] = np.where(df['CLR_BAL_AMT'] >= df['NET AMOUNT'], True, False)
+    df['PROOF_DATE'] = s1
+    df['PROOF_DATE'] = pd.to_datetime(df['PROOF_DATE'])
+    df['TRAN_DATE'] = pd.to_datetime(df['TRAN_DATE'])
+    df['AGE ANALYSIS (DAYS)'] = (df['PROOF_DATE'] - df['TRAN_DATE'])
+    os.remove('modified.xlsx')
+    df.to_excel("maintable.xlsx", index=False)
+    #
+    df1 = pd.read_excel('maintable.xlsx')
+    df2 = pd.read_excel('RATES.xlsx')
+    df3 = df1.merge(df2, on='OTT_CRNCY_CODE')
+    df3.to_excel("maintable.xlsx", index=False)
+    df3 = pd.read_excel("maintable.xlsx")
+    os.remove("maintable.xlsx")
+
+    df3.loc[df3["PART_TRAN_TYPE"] == "D", 'LCY-EQV'] = ((df3['NET AMOUNT']) * (df3['RATE'])) * -1
+    df3.loc[df3["PART_TRAN_TYPE"] == "C", 'LCY-EQV'] = df3['NET AMOUNT'] * df3['RATE']
+
+    df3.fillna(value='N/A', inplace = True)
+    df3.to_excel(f'Proxy_{s1}.xlsx', index=False, sheet_name="Proxy Report")
+
+def createsheets():
+    # from openpyxl import load_workbook
+    InsertColums1()
+    wb = load_workbook(f'Proxy_{s1}.xlsx')
+    sheets = ["Proxy Lien", "Zero Lien", "WC", "BCC CHNW", "WEB", "POS", "ATM", "SUMMARY"]
+    for sheet in sheets:
+        wb.create_sheet(sheet)
+    wb.save(f'Proxy_{s1}.xlsx')
+
+createsheets()
+# filter  sheet1 and copy to sheet proxy lien
+def ProxyLienSheet():
+    excel_file_path = f'Proxy_{s1}.xlsx'
+    # Filter for various sheets
+    df_proxy = pd.read_excel(excel_file_path, sheet_name="Proxy Report")
+    df_pl = df_proxy[(df_proxy["PROXYLIEN"] > 0)]
+    df_zero = df_proxy[(df_proxy["PROXYLIEN"] == 0)]
+    df_bcc = df_pl[(df_pl["SEGMENT"]== "CHNW - CONSUMER AND HIGH NETWORTH CLIENTS") | (df_pl["SEGMENT"]== "BCC - BUSINESS AND COMMERCIAL CLIENTS") ]
+    df_pos = df_bcc[df_bcc['TRAN_PARTICULAR'].str.contains("POS", na=False, case=False)]
+    df_web = df_bcc[df_bcc['TRAN_PARTICULAR'].str.contains("WEB", na=False, case=False)]
+    df_atm = df_bcc[df_bcc['TRAN_PARTICULAR'].str.contains("ATM", na=False, case=False)]
+    df_wc = df_pl[(df_pl["SEGMENT"]== "WC - WHOLESALE CLIENTS")]
+
+
+    values = [
+        ("Proxy", df_proxy["LCY-EQV"].sum()),
+        ("Zero Lien", df_zero["LCY-EQV"].sum()),
+        ("Proxy Lien", df_pl["LCY-EQV"].sum()),
+        ("Total", df_pl["LCY-EQV"].sum()+df_pl["LCY-EQV"].sum() + df_proxy["LCY-EQV"].sum()),
+        ("BCC CHNW", df_bcc["LCY-EQV"].sum()),
+        ("WC", df_wc["LCY-EQV"].sum()),
+        ("Total", df_bcc["LCY-EQV"].sum() + df_wc["LCY-EQV"].sum()),
+    ]
+    POS_sufficientlyfunded = df_pos[(df_pos["SUFFICIENTLY FUNDED"] == True)]
+    df_POS_sufficientlyfunded = POS_sufficientlyfunded["LCY-EQV"].sum()
+    WEB_sufficientlyfunded = df_web[(df_web["SUFFICIENTLY FUNDED"] == True)]
+    df_WEB_sufficientlyfunded = WEB_sufficientlyfunded["LCY-EQV"].sum()
+    ATM_sufficientlyfunded = df_atm[(df_atm["SUFFICIENTLY FUNDED"] == True)]
+    df_ATM_sufficientlyfunded = ATM_sufficientlyfunded["LCY-EQV"].sum()
+    POS_fundedwithPND = df_pos[(df_pos["PND_STATUS"] == "YES") & (df_pos["SUFFICIENTLY FUNDED"] == True)]
+    df_POS_fundedwithPND = POS_fundedwithPND["LCY-EQV"].sum()
+    WEB_fundedwithPND = df_web[(df_web["PND_STATUS"] == "YES") & (df_web["SUFFICIENTLY FUNDED"] == True)]
+    df_WEB_fundedwithPND = WEB_fundedwithPND["LCY-EQV"].sum()
+    ATM_fundedwithPND = df_atm[(df_atm["PND_STATUS"] == "YES") & (df_atm["SUFFICIENTLY FUNDED"] == True)]
+    df_ATM_fundedwithPND = ATM_fundedwithPND["LCY-EQV"].sum()
+    values2 = [
+        ("POS", df_pos["LCY-EQV"].sum(), df_POS_sufficientlyfunded, df_POS_fundedwithPND),
+        ("WEB", df_web["LCY-EQV"].sum(), df_WEB_sufficientlyfunded, df_WEB_fundedwithPND),
+        ("ATM", df_atm["LCY-EQV"].sum(), df_ATM_sufficientlyfunded, df_ATM_fundedwithPND),
+    ]
+    df_summary1 = pd.DataFrame(values, columns=["Description", "Amount"])
+    df_summary2 = pd.DataFrame(values2, columns=["Description", "Amount", "Sufficiently Funded", "Sufficiently Funded(PND)"
+])
+
+    with pd.ExcelWriter(excel_file_path)as writer:
+        df_proxy.to_excel(writer, sheet_name="Proxy Report", index=False)
+        df_pl.to_excel(writer, sheet_name="Proxy Lien", index=False)
+        df_zero.to_excel(writer, sheet_name="Zero Lien", index=False)
+        df_bcc.to_excel(writer, sheet_name="BCC CHNW", index=False)
+        df_wc.to_excel(writer, sheet_name="WC", index=False)
+        df_pos.to_excel(writer, sheet_name="POS", index=False)
+        df_web.to_excel(writer, sheet_name="WEB", index=False)
+        df_atm.to_excel(writer, sheet_name="ATM", index=False)
+        df_summary1.to_excel(writer, sheet_name="SUMMARY", index=False, startrow=1, startcol=0)
+        df_summary2.to_excel(writer, sheet_name="SUMMARY", index=False, startrow=10, startcol=6)
+
+ProxyLienSheet()
+
+# Scrape rates from the website and store in a data frame
+
+# df = pd.read_html('https://en.wikipedia.org/wiki/List_of_S%26P_500_companies')[0]
