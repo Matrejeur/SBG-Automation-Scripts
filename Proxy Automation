@@ -1,16 +1,30 @@
 import pandas as pd
 import numpy as np
 import os
+import re
+# import selenium
+# import pyodbc
 import os.path
+import subprocess
 from openpyxl import load_workbook
+import win32com.client
+# import win32com.client
+import win32com.client.dynamic
+from zipfile import ZipFile
+import warnings
+import pyodbc
+import seaborn as sms
+import math
+import glob
 # from openpyxl.workbook import Workbook
-
-from datetime import datetime
+import sqlalchemy
+from datetime import datetime, date
 from datetime import timedelta
 # current date and time
-now = datetime.now() - timedelta(days=1)
-s1 = now.strftime("%m-%d-%Y")
+# now = datetime.now() - timedelta(days=1)
+# s1 = now.strftime("%m-%d-%Y")
 #
+
 def checkiffileexists():
     if os.path.exists('modified.xlsx'):
         os.remove('modified.xlsx')
@@ -24,140 +38,356 @@ def checkiffileexists():
         os.remove('Proxy.xlsx')
         print("The file has been deleted successfully")
     else:
-        print("The file does not exist")
+        print("No Previous File exists")
+   # os.system(cls)
+
+def clrscr():
+
+    checkiffileexists()
+    subprocess.call('cls',shell=True)
+    print("Screen Cleared")
+
+def saveAttachment():
+    clrscr()
+
+    outlook = win32com.client.Dispatch("Outlook.Application").GetNamespace("MAPI")
+    inbox = outlook.GetDefaultFolder(6).folders("Proxy")
+    messages = inbox.items
+
+    # outlook = win32com.client.Dispatch('outlook.application')
+    # mapi = outlook.GetNamespace("MAPI")
+    # inbox = mapi.GetDefaultFolder(6).Folders["Proxy"]
+    # messages = inbox.Items
+    messages = messages.Restrict("[SenderEmailAddress] = 'Production@stanbicibtc.com'")
+    # messages = messages.Restrict("[SenderEmailAddress] = 'Solomon.Eshiet@stanbicibtc.com'")
+
+    now = date.today() - timedelta(days=2)
+
+
+    try:
+        for message in messages:
+            if message.senton.date() == now:
+            # if message.senton.date() == date.today():
+
+                global filedate
+                filedate = message.senton.date() - timedelta(days=1)
+
+                print(f"The Attachement {message.subject.strip('. ')} received from {message.SenderEmailAddress} on {message.senton.date()} is saved in {os.getcwd()}")
+                attachments = message.Attachments
+                attachment = attachments.Item(1)
+                attachment_name = str(attachment).lower()
+                attachment.SaveASFile(os.getcwd() + '\\' + attachment_name)
+
+
+
+        with ZipFile('Proxy_Report.zip', 'r') as zipObj:
+                zipObj.extractall()
+    except FileNotFoundError:
+        print("Sorry ! Zipfile not found ")
+
+    os.remove('proxy_report.zip')
+
 
 def saveinexcel():
-        checkiffileexists()
-
+        saveAttachment()
+        # global filedate
+        # now = datetime.now() - timedelta(days=1)
+        # filedate = now.strftime("%m-%d-%Y")
  #  Convert the text file to excel and save
-        df= pd.read_csv('Proxy report_04_June_2022.txt', delimiter='|')
-        df.to_excel('modified.xlsx', index=False)
+ #        textfile = glob.glob("/*.txt")
+        try:
+            df = pd.read_csv('Proxy_Report.txt', delimiter='|',  encoding= 'unicode_escape')
 
+            df.to_excel('modified.xlsx', index=False)
+            os.remove('Proxy_Report.txt')
+            os.remove('RATES.xlsx')
+            os.system('cls')
+        except Exception as e:
+
+            print(e)
 # #Add 3 columns
 def InsertColums():
-    saveinexcel()
-    df = pd.read_excel('modified.xlsx')
-    x = 0
-    while x < 3:
-        df.insert(x, "", "",  allow_duplicates=True)
-        x += 1
-    os.remove('modified.xlsx')
+    try:
 
-    df.to_excel("modified.xlsx", index=False)
+        saveinexcel()
+        df = pd.read_excel('modified.xlsx')
+        x = 0
+        while x < 3:
+            df.insert(x, "", "",  allow_duplicates=True)
+            x += 1
+        os.remove('modified.xlsx')
 
+        df.to_excel("modified.xlsx", index=False)
+    except Exception as e:
+        print(e)
 # # Populate Sol ID description
 def mergeTables():
-    InsertColums()
-    df1 = pd.read_excel('modified.xlsx')
-    df2 = pd.read_excel('SOL ID.xlsx')
+    try:
 
-    df3 = pd.merge(df1, df2, on = 'SOL_ID', how='inner')
+        InsertColums()
+        df1 = pd.read_excel('modified.xlsx')
+        df2 = pd.read_excel('SOL ID.xlsx')
 
-    df3 = df3[['SOL_ID',	'SOL_DESC',	'STATE_CODE',	'FORACID',	'FORACID_1',	'CIF_ID',	'CID_ID_1',	'ACCT_NAME',	'CLR_BAL_AMT',	'LIEN_AMT' ,	'TRAN_DATE'	,'TRAN_ID'	, 'PART_TRAN_TYPE'	,'PART_TRAN_SRL_NUM',	'TRAN_PARTICULAR',	'OTT_CRNCY_CODE',	'ORG_TRAN_AMT',	'ACCT_DOMICILE_BRANCH',	'SEGMENT',	'SUBSEGMENT',	'ACCOUNT_STATUS',	'TOTAL_OFFSET_AMOUNT', 'PROXYLIEN',	'PND_STATUS',	'SCHM_CODE'
+        df3 = pd.merge(df1, df2, on= 'SOL_ID', how='inner')
 
-    ]]
+        df3 = df3[['SOL_ID', 'SOL_DESC',	'STATE_CODE',	'FORACID',	'FORACID_1',	'CIF_ID',	'CID_ID_1',	'ACCT_NAME',	'CLR_BAL_AMT',	'LIEN_AMT' ,	'TRAN_DATE'	,'TRAN_ID'	, 'PART_TRAN_TYPE'	,'PART_TRAN_SRL_NUM',	'TRAN_PARTICULAR',	'OTT_CRNCY_CODE',	'ORG_TRAN_AMT',	'ACCT_DOMICILE_BRANCH',	'SEGMENT',	'SUBSEGMENT',	'ACCOUNT_STATUS',	'TOTAL_OFFSET_AMOUNT', 'PROXYLIEN',	'PND_STATUS',	'SCHM_CODE'
 
-    os.remove('modified.xlsx')
+        ]]
 
-    df3.to_excel("modified.xlsx", index= False)
+        os.remove('modified.xlsx')
+
+        df3.to_excel("modified.xlsx", index= False)
+    except Exception as e:
+        print(e)
+def extract():
+    mergeTables()
+    try:
+     warnings.filterwarnings("ignore")
+     trusted_conn =  pyodbc.connect('DRIVER={ODBC Driver 17 for Sql Server};' 
+                                   'SERVER=10.234.18.155;'
+                                   'DATABASE=RSVRRealtimeFinacleNG;'
+                                   'Trusted_Connection=yes;')
+
+     df_rate = pd.read_sql('''SELECT FXD_CRNCY_CODE AS OTT_CRNCY_CODE, CUST_VAR_CRNCY_UNITS AS RATES
+FROM [TBAADM].[RATELIST_HIST_TABLE]
+WHERE RATECODE = 'REV'
+AND RTLIST_DATE = DATEADD(dd,-1,CAST(GETDATE() AS DATE))
+AND VAR_CRNCY_CODE = 'NGN'
+AND RTLIST_NUM = 2
+''', trusted_conn)
+     df_rate.to_excel('data.xlsx', index=False)
+     data = {'OTT_CRNCY_CODE': ['NGN'],
+             'RATES': [1]}
+
+     df2 = pd.DataFrame(data)
+     df_rate = pd.read_excel('data.xlsx')
+     newrate = pd.concat([df2, df_rate], ignore_index=True)
+     newrate.to_excel('RATES.xlsx', index=False)
+
+    except Exception as e:
+     print(e)
 
 def InsertColums1():
-    mergeTables()
-    df = pd.read_excel('modified.xlsx')
-    y = ['NET AMOUNT', 'LCY-EQV',	'PROOF_DATE','AGE ANALYSIS (DAYS)', 'SUFFICIENTLY FUNDED']
-    for i in y:
-        df[i] = ""
 
-    df['NET AMOUNT'] = df['ORG_TRAN_AMT'] - df['TOTAL_OFFSET_AMOUNT']
-    df['SUFFICIENTLY FUNDED'] = np.where(df['CLR_BAL_AMT'] >= df['NET AMOUNT'], True, False)
-    df['PROOF_DATE'] = s1
-    df['PROOF_DATE'] = pd.to_datetime(df['PROOF_DATE'])
-    df['TRAN_DATE'] = pd.to_datetime(df['TRAN_DATE'])
-    df['AGE ANALYSIS (DAYS)'] = (df['PROOF_DATE'] - df['TRAN_DATE'])
-    os.remove('modified.xlsx')
-    df.to_excel("maintable.xlsx", index=False)
-    #
-    df1 = pd.read_excel('maintable.xlsx')
-    df2 = pd.read_excel('RATES.xlsx')
-    df3 = df1.merge(df2, on='OTT_CRNCY_CODE')
-    df3.to_excel("maintable.xlsx", index=False)
-    df3 = pd.read_excel("maintable.xlsx")
-    os.remove("maintable.xlsx")
+    try:
 
-    df3.loc[df3["PART_TRAN_TYPE"] == "D", 'LCY-EQV'] = ((df3['NET AMOUNT']) * (df3['RATE'])) * -1
-    df3.loc[df3["PART_TRAN_TYPE"] == "C", 'LCY-EQV'] = df3['NET AMOUNT'] * df3['RATE']
+        extract()
+        df = pd.read_excel('modified.xlsx')
+        y = ['NET AMOUNT', 'LCY-EQV',	'PROOF_DATE','AGE ANALYSIS (DAYS)', 'SUFFICIENTLY FUNDED']
+        for i in y:
+            df[i] = ""
 
-    df3.fillna(value='N/A', inplace = True)
-    df3.to_excel(f'Proxy_{s1}.xlsx', index=False, sheet_name="Proxy Report")
+        df['NET AMOUNT'] = df['ORG_TRAN_AMT'] - df['TOTAL_OFFSET_AMOUNT']
+        df['SUFFICIENTLY FUNDED'] = np.where(df['CLR_BAL_AMT'] >= df['NET AMOUNT'], True, False)
+        df['PROOF_DATE'] = filedate
+        df['PROOF_DATE'] = pd.to_datetime(df['PROOF_DATE'])
+        df['TRAN_DATE'] = pd.to_datetime(df['TRAN_DATE'])
+        df['AGE ANALYSIS (DAYS)'] = (df['PROOF_DATE'] - df['TRAN_DATE'])
+        os.remove('modified.xlsx')
+        df.to_excel("maintable.xlsx", index=False)
+        #
+        df1 = pd.read_excel('maintable.xlsx')
+
+        pd.options.mode.chained_assignment = None
+        with warnings.catch_warnings(record=True):
+            warnings.simplefilter("always")
+
+        df2 = pd.read_excel('RATES.xlsx')
+
+        df3 = df1.merge(df2, on='OTT_CRNCY_CODE')
+        df3.to_excel("maintable.xlsx", index=False)
+        df3 = pd.read_excel("maintable.xlsx")
+        os.remove("maintable.xlsx")
+        os.remove("data.xlsx")
+
+        df3.loc[df3["PART_TRAN_TYPE"] == "D", 'LCY-EQV'] = ((df3['NET AMOUNT']) * (df3['RATES'])) * -1
+        df3.loc[df3["PART_TRAN_TYPE"] == "C", 'LCY-EQV'] = df3['NET AMOUNT'] * df3['RATES']
+
+        df3.fillna(value='N/A', inplace = True)
+        df3.to_excel(f'Proxy_{filedate}.xlsx', index=False, sheet_name="Proxy Report")
+    except Exception as e:
+        print(e)
 
 def createsheets():
     # from openpyxl import load_workbook
-    InsertColums1()
-    wb = load_workbook(f'Proxy_{s1}.xlsx')
-    sheets = ["Proxy Lien", "Zero Lien", "WC", "BCC CHNW", "WEB", "POS", "ATM", "SUMMARY"]
-    for sheet in sheets:
-        wb.create_sheet(sheet)
-    wb.save(f'Proxy_{s1}.xlsx')
+    try:
+        InsertColums1()
+        wb = load_workbook(f'Proxy_{filedate}.xlsx')
+        sheets = ["Proxy Lien", "Zero Lien", "WC", "BCC CHNW", "WEB", "POS", "ATM", "POSWEBATM" ,"SUMMARY"]
+        # sheets = ["Proxy Lien", "Zero Lien", "WC", "BCC CHNW", "WEB", "POS", "ATM", "SUMMARY"]
+        for sheet in sheets:
+            wb.create_sheet(sheet)
+        wb.save(f'Proxy_{filedate}.xlsx')
 
-createsheets()
+    except Exception as e:
+        print(e)
 # filter  sheet1 and copy to sheet proxy lien
 def ProxyLienSheet():
-    excel_file_path = f'Proxy_{s1}.xlsx'
-    # Filter for various sheets
-    df_proxy = pd.read_excel(excel_file_path, sheet_name="Proxy Report")
-    df_pl = df_proxy[(df_proxy["PROXYLIEN"] > 0)]
-    df_zero = df_proxy[(df_proxy["PROXYLIEN"] == 0)]
-    df_bcc = df_pl[(df_pl["SEGMENT"]== "CHNW - CONSUMER AND HIGH NETWORTH CLIENTS") | (df_pl["SEGMENT"]== "BCC - BUSINESS AND COMMERCIAL CLIENTS") ]
-    df_pos = df_bcc[df_bcc['TRAN_PARTICULAR'].str.contains("POS", na=False, case=False)]
-    df_web = df_bcc[df_bcc['TRAN_PARTICULAR'].str.contains("WEB", na=False, case=False)]
-    df_atm = df_bcc[df_bcc['TRAN_PARTICULAR'].str.contains("ATM", na=False, case=False)]
-    df_wc = df_pl[(df_pl["SEGMENT"]== "WC - WHOLESALE CLIENTS")]
+    try:
+
+            createsheets()
+            warnings.filterwarnings("ignore",'This pattern is interpreted as a regular expression, and has match groups')
+            excel_file_path = f'Proxy_{filedate}.xlsx'
+            excel_file_path2 = "WeeklyProxyDashboard.xlsx"
+            # Filter for various
+            df_proxy = pd.read_excel(excel_file_path, sheet_name="Proxy Report")
+            df_proxy_pivot = pd.pivot_table(df_proxy, index=['FORACID_1','SOL_ID', 'SOL_DESC', 'PND_STATUS', 'SUFFICIENTLY FUNDED'], aggfunc={'CLR_BAL_AMT': np.sum, 'LCY-EQV': np.sum})
+            df_pl = df_proxy[(df_proxy["PROXYLIEN"] > 0)]
+            df_pl_pivot = pd.pivot_table(df_pl, index=['FORACID_1', 'SOL_ID', 'SOL_DESC', 'PND_STATUS', 'SUFFICIENTLY FUNDED'], aggfunc={'CLR_BAL_AMT': np.sum, 'LCY-EQV': np.sum})
+            df_zero = df_proxy[(df_proxy["PROXYLIEN"] == 0)]
+            df_chnw = df_pl[(df_pl["SEGMENT"]== "CHNW - CONSUMER AND HIGH NETWORTH CLIENTS")]
+            df_chnw_pivot = pd.pivot_table(df_chnw, index=['FORACID_1', 'SOL_ID',  'SOL_DESC', 'PND_STATUS', 'SUFFICIENTLY FUNDED'], aggfunc={'CLR_BAL_AMT': np.sum, 'LCY-EQV': np.sum})
+            df_bcc = df_pl[(df_pl["SEGMENT"]== "BCC - BUSINESS AND COMMERCIAL CLIENTS")]
+            df_bcc_pivot = pd.pivot_table(df_bcc, index=['FORACID_1', 'SOL_ID',  'SOL_DESC', 'PND_STATUS', 'SUFFICIENTLY FUNDED'], aggfunc={'CLR_BAL_AMT': np.sum, 'LCY-EQV': np.sum})
+            df_bcc_chnw = df_pl[(df_pl["SEGMENT"]== "CHNW - CONSUMER AND HIGH NETWORTH CLIENTS") | (df_pl["SEGMENT"]== "BCC - BUSINESS AND COMMERCIAL CLIENTS") ]
+            df_bcc_chnw_pivot = pd.pivot_table(df_bcc_chnw, index=['FORACID_1', 'SOL_ID',  'SOL_DESC', 'PND_STATUS', 'SUFFICIENTLY FUNDED'], aggfunc={'CLR_BAL_AMT': np.sum, 'LCY-EQV': np.sum})
+            df_pos = df_bcc_chnw[df_bcc_chnw['TRAN_PARTICULAR'].str.contains("POS", na=False, case=False)]
+            df_web = df_bcc_chnw[df_bcc_chnw['TRAN_PARTICULAR'].str.contains("WEB", na=False, case=False)]
+            df_atm = df_bcc_chnw[df_bcc_chnw['TRAN_PARTICULAR'].str.contains("ATM", na=False, case=False)]
+            df_wc = df_pl[(df_pl["SEGMENT"]== "WC - WHOLESALE CLIENTS")]
+            df_wc_pivot = pd.pivot_table(df_wc, index=['FORACID_1', 'SOL_ID',  'SOL_DESC', 'PND_STATUS', 'SUFFICIENTLY FUNDED'], aggfunc={'CLR_BAL_AMT': np.sum, 'LCY-EQV': np.sum})
+            df_poswebatm = df_bcc_chnw[df_bcc_chnw['TRAN_PARTICULAR'].str.contains("ATM|POS|WEB", na=False, case=False)]
+            df_poswebatm_pivot = pd.pivot_table(df_poswebatm, index=['FORACID_1', 'SOL_ID', 'SOL_DESC', 'PND_STATUS', 'SUFFICIENTLY FUNDED'], aggfunc={'CLR_BAL_AMT': np.sum, 'LCY-EQV': np.sum})
+            df_chgbk = df_poswebatm[df_poswebatm['TRAN_PARTICULAR'].str.contains("CHB", na=False, case=False)]
+            df_digichannels = df_poswebatm[df_poswebatm['TRAN_PARTICULAR'].str.contains("revPOS", na=False, case=False)]
+            df_digichannels_pivot = pd.pivot_table(df_digichannels, index=['FORACID_1','SOL_ID', 'SOL_DESC', 'PND_STATUS','SUFFICIENTLY FUNDED'], aggfunc={'CLR_BAL_AMT': np.sum, 'LCY-EQV': np.sum})
+            df_recon = df_poswebatm[~df_poswebatm['TRAN_PARTICULAR'].str.contains("REF|CHB|revPOS|CORALPAY|PAYMENT", na=False, case=False)]
+            df_recons = df_recon[(df_recon['SOL_ID'] == 990912) & (df_recon['SCHM_CODE'] != "ODVIS" )]
+            # df_rec = df_recon[(df_recon['SCHM_CODE'] ==  "ODVIS")]
+            df_reconcilatn = df_recons[(df_recons['TRAN_PARTICULAR'].str.contains(r'(\d{2}[./-]\d{2}[./-]\d{2,4})', na=False, case=False, regex=True))]
+            df_reconcilatn_pivot = pd.pivot_table(df_reconcilatn, index=['FORACID_1','SOL_ID', 'SOL_DESC', 'PND_STATUS', 'SUFFICIENTLY FUNDED'], aggfunc={'CLR_BAL_AMT': np.sum, 'LCY-EQV': np.sum})
+            df_creditcard = df_poswebatm[df_poswebatm['SCHM_CODE'] == "ODVIS"]
+            df_creditcard_pivot = pd.pivot_table(df_creditcard, index=['FORACID_1','SOL_ID', 'SOL_DESC', 'PND_STATUS', 'SUFFICIENTLY FUNDED'], aggfunc={'CLR_BAL_AMT': np.sum, 'LCY-EQV': np.sum})
+            df_systementries = df_poswebatm[df_poswebatm['SCHM_CODE'] != "ODVIS"]
+            df_system = df_systementries[df_systementries['TRAN_PARTICULAR'].str.contains("PURCHASE       @|PURCHASE@|ATM WTD@")]
+            df_system_pivot = pd.pivot_table(df_system, index=['FORACID_1', 'SOL_ID', 'SOL_DESC', 'PND_STATUS', 'SUFFICIENTLY FUNDED'], aggfunc={'CLR_BAL_AMT': np.sum, 'LCY-EQV': np.sum})
+            df_payment = df_poswebatm[df_poswebatm['TRAN_PARTICULAR'].str.contains("CORALPAY|REF|POS PAYMENT|TRF|Trf|REV OF PAYMENT|ATM PAYMENT|WEB PAYMENT", na=False, case=False)]
+            df_opc = df_payment[~df_payment['TRAN_PARTICULAR'].str.contains("/TRF-ACC", na=False, case=False)]
+            df_opc_pivot = pd.pivot_table(df_opc, index=['FORACID_1', 'SOL_ID', 'SOL_DESC', 'PND_STATUS', 'SUFFICIENTLY FUNDED'], aggfunc={'CLR_BAL_AMT': np.sum, 'LCY-EQV': np.sum})
+
+            df_chgbk_pivot = pd.pivot_table(df_chgbk, index=['FORACID_1', 'SOL_ID',  'SOL_DESC', 'PND_STATUS', 'SUFFICIENTLY FUNDED'], aggfunc={'CLR_BAL_AMT': np.sum, 'LCY-EQV': np.sum})
 
 
-    values = [
-        ("Proxy", df_proxy["LCY-EQV"].sum()),
-        ("Zero Lien", df_zero["LCY-EQV"].sum()),
-        ("Proxy Lien", df_pl["LCY-EQV"].sum()),
-        ("Total", df_pl["LCY-EQV"].sum()+df_pl["LCY-EQV"].sum() + df_proxy["LCY-EQV"].sum()),
-        ("BCC CHNW", df_bcc["LCY-EQV"].sum()),
-        ("WC", df_wc["LCY-EQV"].sum()),
-        ("Total", df_bcc["LCY-EQV"].sum() + df_wc["LCY-EQV"].sum()),
-    ]
-    POS_sufficientlyfunded = df_pos[(df_pos["SUFFICIENTLY FUNDED"] == True)]
-    df_POS_sufficientlyfunded = POS_sufficientlyfunded["LCY-EQV"].sum()
-    WEB_sufficientlyfunded = df_web[(df_web["SUFFICIENTLY FUNDED"] == True)]
-    df_WEB_sufficientlyfunded = WEB_sufficientlyfunded["LCY-EQV"].sum()
-    ATM_sufficientlyfunded = df_atm[(df_atm["SUFFICIENTLY FUNDED"] == True)]
-    df_ATM_sufficientlyfunded = ATM_sufficientlyfunded["LCY-EQV"].sum()
-    POS_fundedwithPND = df_pos[(df_pos["PND_STATUS"] == "YES") & (df_pos["SUFFICIENTLY FUNDED"] == True)]
-    df_POS_fundedwithPND = POS_fundedwithPND["LCY-EQV"].sum()
-    WEB_fundedwithPND = df_web[(df_web["PND_STATUS"] == "YES") & (df_web["SUFFICIENTLY FUNDED"] == True)]
-    df_WEB_fundedwithPND = WEB_fundedwithPND["LCY-EQV"].sum()
-    ATM_fundedwithPND = df_atm[(df_atm["PND_STATUS"] == "YES") & (df_atm["SUFFICIENTLY FUNDED"] == True)]
-    df_ATM_fundedwithPND = ATM_fundedwithPND["LCY-EQV"].sum()
-    values2 = [
-        ("POS", df_pos["LCY-EQV"].sum(), df_POS_sufficientlyfunded, df_POS_fundedwithPND),
-        ("WEB", df_web["LCY-EQV"].sum(), df_WEB_sufficientlyfunded, df_WEB_fundedwithPND),
-        ("ATM", df_atm["LCY-EQV"].sum(), df_ATM_sufficientlyfunded, df_ATM_fundedwithPND),
-    ]
-    df_summary1 = pd.DataFrame(values, columns=["Description", "Amount"])
-    df_summary2 = pd.DataFrame(values2, columns=["Description", "Amount", "Sufficiently Funded", "Sufficiently Funded(PND)"
-])
+            values = [
+                ("Proxy", round(df_proxy["LCY-EQV"].sum(),2)),
 
-    with pd.ExcelWriter(excel_file_path)as writer:
-        df_proxy.to_excel(writer, sheet_name="Proxy Report", index=False)
-        df_pl.to_excel(writer, sheet_name="Proxy Lien", index=False)
-        df_zero.to_excel(writer, sheet_name="Zero Lien", index=False)
-        df_bcc.to_excel(writer, sheet_name="BCC CHNW", index=False)
-        df_wc.to_excel(writer, sheet_name="WC", index=False)
-        df_pos.to_excel(writer, sheet_name="POS", index=False)
-        df_web.to_excel(writer, sheet_name="WEB", index=False)
-        df_atm.to_excel(writer, sheet_name="ATM", index=False)
-        df_summary1.to_excel(writer, sheet_name="SUMMARY", index=False, startrow=1, startcol=0)
-        df_summary2.to_excel(writer, sheet_name="SUMMARY", index=False, startrow=10, startcol=6)
+                ("Zero Lien", round(df_zero["LCY-EQV"].sum(),2)),
+                ("Proxy Lien", round(df_pl["LCY-EQV"].sum(),2)),
+                ("Total", round(df_pl["LCY-EQV"].sum() + df_zero["LCY-EQV"].sum(),2)),
+                ("BCC CHNW", round(df_bcc_chnw["LCY-EQV"].sum(),2)),
+                ("WC", round(df_wc["LCY-EQV"].sum(),2)),
+                ("Total", round(df_bcc_chnw["LCY-EQV"].sum() + df_wc["LCY-EQV"].sum(),2)),
+            ]
+            POS_sufficientlyfunded = df_pos[(df_pos["SUFFICIENTLY FUNDED"] == True)]
+            df_POS_sufficientlyfunded = round(POS_sufficientlyfunded["LCY-EQV"].sum(), 2)
+            WEB_sufficientlyfunded = df_web[(df_web["SUFFICIENTLY FUNDED"] == True)]
+            df_WEB_sufficientlyfunded = round(WEB_sufficientlyfunded["LCY-EQV"].sum(),2)
+            ATM_sufficientlyfunded = df_atm[(df_atm["SUFFICIENTLY FUNDED"] == True)]
+            df_ATM_sufficientlyfunded = round(ATM_sufficientlyfunded["LCY-EQV"].sum(),2)
+            POS_fundedwithPND = df_pos[(df_pos["PND_STATUS"] == "YES") & (df_pos["SUFFICIENTLY FUNDED"] == True)]
+            df_POS_fundedwithPND = round(POS_fundedwithPND["LCY-EQV"].sum(),2)
+            WEB_fundedwithPND = df_web[(df_web["PND_STATUS"] == "YES") & (df_web["SUFFICIENTLY FUNDED"] == True)]
+            df_WEB_fundedwithPND = round(WEB_fundedwithPND["LCY-EQV"].sum(),2)
+            ATM_fundedwithPND = df_atm[(df_atm["PND_STATUS"] == "YES") & (df_atm["SUFFICIENTLY FUNDED"] == True)]
+            df_ATM_fundedwithPND = round(ATM_fundedwithPND["LCY-EQV"].sum(),2)
+            POS_percent = round(((df_POS_fundedwithPND/df_POS_sufficientlyfunded)*100),2)
+            WEB_percent = round(((df_WEB_fundedwithPND / df_WEB_sufficientlyfunded) * 100), 2)
+            ATM_percent = round(((df_ATM_fundedwithPND / df_ATM_sufficientlyfunded) * 100), 2)
+            Total_percent = ((df_POS_fundedwithPND + df_WEB_fundedwithPND + df_ATM_fundedwithPND)/(df_POS_sufficientlyfunded + df_WEB_sufficientlyfunded + df_ATM_sufficientlyfunded)* 100)
+            values2 = [
+                ("POS", round(df_pos["LCY-EQV"].sum(),2), df_POS_sufficientlyfunded, df_POS_fundedwithPND, POS_percent),
+                ("WEB", round(df_web["LCY-EQV"].sum(),2), df_WEB_sufficientlyfunded, df_WEB_fundedwithPND, WEB_percent),
+                ("ATM", round(df_atm["LCY-EQV"].sum(),2), df_ATM_sufficientlyfunded, df_ATM_fundedwithPND, ATM_percent),
+                ("TOTAL", round((df_pos["LCY-EQV"].sum() + df_web["LCY-EQV"].sum() + df_atm["LCY-EQV"].sum()),2), round((df_POS_sufficientlyfunded + df_WEB_sufficientlyfunded + df_ATM_sufficientlyfunded),2), round((df_POS_fundedwithPND + df_WEB_fundedwithPND + df_ATM_fundedwithPND), 2), round(Total_percent, 2))
+            ]
 
-ProxyLienSheet()
+
+            df_summary1 = pd.DataFrame(values, columns=["Description", "Amount"])
+            df_summary2 = pd.DataFrame(values2, columns=["Description", "Amount", "Sufficiently Funded", "Sufficiently Funded(PND)", "% Sufficiently Funded(PND)"
+        ])
+
+
+            with pd.ExcelWriter(excel_file_path)as writer:
+                df_proxy.to_excel(writer, sheet_name="Proxy Report", index=False)
+                df_proxy_pivot.to_excel(writer, sheet_name="Proxy Report Pivoted", index=True)
+                df_pl.to_excel(writer, sheet_name="Proxy Lien", index=False)
+                df_pl_pivot.to_excel(writer, sheet_name="Proxy Lien Pivoted", index=True)
+                df_zero.to_excel(writer, sheet_name="Zero Lien", index=False)
+                df_bcc.to_excel(writer, sheet_name="BCC", index=False)
+                df_bcc_pivot.to_excel(writer, sheet_name="BCC Pivoted", index=True)
+
+                df_chnw.to_excel(writer, sheet_name="CHNW", index=False)
+                df_chnw_pivot.to_excel(writer, sheet_name="CHNW Pivoted", index=True)
+                df_bcc_chnw.to_excel(writer, sheet_name="BCC CHNW", index=False)
+                df_bcc_chnw_pivot.to_excel(writer, sheet_name="BCC CHNW Pivoted", index=True)
+                df_wc.to_excel(writer, sheet_name="WC", index=False)
+                df_wc_pivot.to_excel(writer, sheet_name="WC Pivoted", index=True)
+                df_pos.to_excel(writer, sheet_name="POS", index=False)
+                df_web.to_excel(writer, sheet_name="WEB", index=False)
+                df_atm.to_excel(writer, sheet_name="ATM", index=False)
+                df_poswebatm.to_excel(writer, sheet_name= "POSWEBATM", index=False)
+                df_poswebatm_pivot.to_excel(writer, sheet_name="POSWEBATM Pivoted", index=True)
+                df_chgbk.to_excel(writer, sheet_name= "CHARGEBACK", index=False)
+                df_chgbk_pivot.to_excel(writer, sheet_name="CHARGEBACK Pivoted", index=True)
+                df_reconcilatn.to_excel(writer, sheet_name= "RECONCILIATION", index= False)
+                df_reconcilatn_pivot.to_excel(writer, sheet_name="RECONCILIATION Pivoted", index=True)
+                df_digichannels.to_excel(writer, sheet_name="Digital Channels", index=False)
+                df_digichannels_pivot.to_excel(writer, sheet_name="Digital Channels Pivoted", index=True)
+                df_opc.to_excel(writer, sheet_name= "OPC", index= False)
+                df_opc_pivot.to_excel(writer, sheet_name="OPC Pivoted", index=True)
+                df_system.to_excel(writer, sheet_name="System Entries", index=False)
+                df_system_pivot.to_excel(writer, sheet_name="System Entries Pivoted", index=True)
+                df_creditcard.to_excel(writer, sheet_name="Credit Card", index=False)
+                df_creditcard_pivot.to_excel(writer, sheet_name="Credit Card Pivoted", index=True)
+                # df_remains.to_excel(writer, sheet_name="Remains", index=False)
+                df_summary1.to_excel(writer, sheet_name="SUMMARY", index=False, startrow=1, startcol=0)
+                df_summary2.to_excel(writer, sheet_name="SUMMARY", index=False, startrow=10, startcol=6)
+                # df_summary3.to_excel(writer, sheet_name="SUMMARY", index=False. startrow=20, startcol=10)
+                # sms.to_excel(writer, sheet_name="SUMMARY", index=False, startrow=20, startcol=6)
+
+
+                # with pd.ExcelWriter(excel_file_path2) as writer2:
+                #     if now == "Monday":
+                #         pass
+                #     df_summary4.to_excel(writer2, sheet_name="sheet2", index=False, startcol=)
+                #      pass
+
+
+                # for __ in range(5):
+                #     pass
+    except Exception as e:
+        print(e)
+def sendmail():
+    ProxyLienSheet()
+
+
+    # outlook = win32com.client.Dispatch('outlook.application')
+    # outlook = win32com.client.Dispatch("Outlook.Application").GetNamespace("MAPI")
+    outlook = win32com.client.Dispatch("Outlook.Application")
+    mail = outlook.CreateItem(0)
+    mail.To = 'nnamdi.ago@stanbicibtc.com; muhammed.ibrahim@stanbicibtc.com; John.Uwagbale2@stanbicibtc.com; nosarieme.faluyi@stanbicibtc.com; abimbola.oyetunji@stanbicibtc.com; Olugbenga.Ojedapo@stanbicibtc.com; Seyi.Akinyemi@stanbicibtc.com; Oluwaseun.Oshin@stanbicibtc.com; laide.okelola@stanbicibtc.com; gbenga.akinyemi@stanbicibtc.com; olubukola.owolabi@stanbicibtc.com; ugochukwu.amadi@stanbicibtc.com; olumuyiwa.oyedele@stanbicibtc.com; morufu.oyetunmbi@stanbicibtc.com; kenneth.iserhien@stanbicibtc.com; bamishe.abolude@stanbicibtc.com; olumuyiwaafolabi.tubi@stanbicibtc.com'
+    # mail.To = 'nnamdi.ago@stanbicibtc.com; kenneth.iserhien@stanbicibtc.com'
+    mail.Subject = f'Automated Proxy Report for {filedate}'
+    mail.HTMLBody = r"""
+    Dear All,<br><br>
+    Please find attached the proxy report segmentation for the above stated date. Kindly document and send recoveries done daily. <br><br>
+
+    Regards,<br>
+    Nnamdi Ago
+    """
+    # To attach a file to the email (optional):a
+    # attachment = os.getcwd() + f'\\Proxy_{filedate}.xlsx'
+    attachment = os.getcwd() + f'\\Proxy_{filedate}.xlsx'
+    mail.Attachments.Add(attachment)
+
+    mail.Send()
+if __name__ == '__main__':
+        # sendmail()
+       ProxyLienSheet()
+
+
 
 # Scrape rates from the website and store in a data frame
+# mail to dowload proxy attachment from inbox
 
-# df = pd.read_html('https://en.wikipedia.org/wiki/List_of_S%26P_500_companies')[0]
+# df = pd.read_html('https://app.powerbi.com/groups/me/reports/722876b8-6163-4b30-a035-1f6e1428efc7/ReportSectiondb7f99cd52d65e36485e?ctid=7369e6ec-faa6-42fa-bc0e-4f332da5b1db&openReportSource=ReportInvitation')[0]g
